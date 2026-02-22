@@ -1,0 +1,10 @@
+{
+  "name": "shell-relay",
+  "version": "1.0.0",
+  "description": "WebSocket shell relay daemon",
+  "main": "server.js",
+  "dependencies": {
+    "ws": "^8.16.0",
+    "node-pty": "^1.0.0"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "port": 8765,
+  "host": "127.0.0.1",
+  "token": "REPLACE_WITH_YOUR_TOKEN",
+  "shell": "/bin/zsh",
+  "maxSessions": 10,
+  "idleTimeoutMs": 300000,
+  "maxPayloadBytes": 16384,
+  "rateLimit": {
+    "perIpMaxConnections": 5,
+    "commandWindowMs": 10000,
+    "commandMaxPerWindow": 10
+  },
+  "outputCaps": {
+    "stdoutBytes": 262144,
+    "stderrBytes": 131072
+  },
+  "authThrottle": {
+    "windowMs": 600000,
+    "maxFailures": 6,
+    "banMs": 900000
+  },
+  "commandAllowlist": [
+    "^(ls|pwd|whoami|id|uname|date|uptime|df|du|free|top|ps|pgrep|echo|cat|head|tail|grep|awk|sed|cut|sort|uniq|wc|find|which|whereis|stat|file|env|printenv|git|npm|node|python3?|pip3?|brew|launchctl|system_profiler|scutil|networksetup|ifconfig|ping|traceroute|nslookup|dig|curl|wget|ssh|scp|rsync|tar|zip|unzip|mkdir|rmdir|touch|cp|mv|open|defaults|plutil|osascript|xcodebuild|swift|make|cmake)(\\s|$)"
+  ],
+  "commandBlocklist": [
+    "(^|\\s)(rm\\s+-rf\\s+/)(\\s|$)",
+    "(^|\\s)(mkfs|dd\\s+if=|shred)(\\s|$)",
+    "(:\\(\\)\\s*\\{\\s*:\\|:\\s*&\\s*\\};:)",
+    "(^|\\s)sudo\\s+rm\\s+-rf(\\s|$)",
+    "(^|\\s)(shutdown|reboot|halt)(\\s|$)",
+    "(^|\\s)launchctl\\s+bootout\\s+system(\\s|$)",
+    "(^|\\s)chmod\\s+-R\\s+777\\s+/(\\s|$)",
+    "(^|\\s)chown\\s+-R\\s+.*\\s+/(\\s|$)"
+  ],
+  "tls": {
+    "enabled": true,
+    "cert": "/usr/local/opt/shell-relay/cert.pem",
+    "key": "/usr/local/opt/shell-relay/key.pem"
+  },
+  "logging": {
+    "level": "info",
+    "file": "/usr/local/opt/shell-relay/logs/relay.log"
+  }
+}

@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
+const pty = require('node-pty'); // PTY_SUPPORT_PATCHED
 
 const CONFIG_PATH = process.env.SHELL_RELAY_CONFIG || path.join(__dirname, 'config.json');
 const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
@@ -166,6 +167,7 @@ class ShellSession {
     this.authenticated = false;
     this.lastActivity = now();
     this.cmdTimestamps = [];
+    this.ptyProcess = null;
   }
 
   send(msg) {
@@ -313,7 +315,94 @@ class ShellSession {
     }
   }
 
+  ptySpawn(opts = {}) {
+    this.lastActivity = now();
+    if (this.ptyProcess) {
+      this.send({ type: 'error', message: 'PTY already active. Send pty_kill first.' });
+      return;
+    }
+
+    const cols = Math.min(Math.max(opts.cols || 80, 10), 500);
+    const rows = Math.min(Math.max(opts.rows || 24, 2), 200);
+    const cmd = opts.command || '';
+
+    // If a command is provided, validate it
+    if (cmd) {
+      const policy = commandAllowed(cmd);
+      if (!policy.allowed) {
+        this.send({ type: 'error', message: policy.reason });
+        return;
+      }
+    }
+
+    log('info', 'PTY spawn', {
+      sessionId: this.sessionId,
+      clientIp: this.clientIp,
+      cols, rows,
+      commandHash: cmd ? sha256(cmd) : 'shell'
+    });
+
+    const shellArgs = cmd ? ['-l', '-c', cmd] : ['-l'];
+
+    this.ptyProcess = pty.spawn(SHELL, shellArgs, {
+      name: 'xterm-256color',
+      cols,
+      rows,
+      cwd: process.env.HOME || '/Users/ben',
+      env: { ...process.env, TERM: 'xterm-256color', SHELL_RELAY_SESSION: this.sessionId }
+    });
+
+    this.send({ type: 'pty_spawned', pid: this.ptyProcess.pid, cols, rows });
+
+    this.ptyProcess.onData((data) => {
+      this.lastActivity = now();
+      this.send({ type: 'pty_data', data });
+    });
+
+    this.ptyProcess.onExit(({ exitCode, signal }) => {
+      this.send({ type: 'pty_exit', code: exitCode, signal });
+      log('info', 'PTY exit', { sessionId: this.sessionId, code: exitCode, signal });
+      this.ptyProcess = null;
+    });
+  }
+
+  ptyInput(data) {
+    this.lastActivity = now();
+    if (this.ptyProcess) {
+      this.ptyProcess.write(String(data || ''));
+    } else {
+      this.send({ type: 'error', message: 'No active PTY' });
+    }
+  }
+
+  ptyResize(cols, rows) {
+    this.lastActivity = now();
+    if (this.ptyProcess) {
+      const c = Math.min(Math.max(cols || 80, 10), 500);
+      const r = Math.min(Math.max(rows || 24, 2), 200);
+      this.ptyProcess.resize(c, r);
+      this.send({ type: 'pty_resized', cols: c, rows: r });
+    } else {
+      this.send({ type: 'error', message: 'No active PTY' });
+    }
+  }
+
+  ptyKill() {
+    if (this.ptyProcess) {
+      this.ptyProcess.kill();
+      this.ptyProcess = null;
+      this.send({ type: 'pty_killed' });
+      log('info', 'PTY killed', { sessionId: this.sessionId });
+    } else {
+      this.send({ type: 'error', message: 'No active PTY' });
+    }
+  }
+
   close() {
+    if (this.ptyProcess) {
+      try { this.ptyProcess.kill(); } catch (_) {}
+      this.ptyProcess = null;
+    }
     if (this.proc) {
       try { this.proc.kill('SIGKILL'); } catch (_) {}
       this.proc = null;
@@ -410,6 +499,18 @@ wss.on('connection', (ws, req) => {
       case 'ping':
         session.send({ type: 'pong', ts: msg.ts });
         session.lastActivity = now();
+        break;
+      case 'pty_spawn':
+        session.ptySpawn({ cols: msg.cols, rows: msg.rows, command: msg.command });
+        break;
+      case 'pty_input':
+        session.ptyInput(msg.data);
+        break;
+      case 'pty_resize':
+        session.ptyResize(msg.cols, msg.rows);
+        break;
+      case 'pty_kill':
+        session.ptyKill();
         break;
       default:
         session.send({ type: 'error', message: `Unknown type: ${msg.type}` });

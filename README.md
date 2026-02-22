@@ -7,13 +7,13 @@ A lightweight, hardened WebSocket daemon that provides AI agents with direct zsh
 Shell Relay runs as a macOS LaunchAgent and exposes a JSON-over-WebSocket API for authenticated command execution. Designed for AI agent ↔ host machine communication with security-first defaults.
 
 ```
-┌─────────────────────┐       wss:// (TLS)       ┌─────────────────────┐
-│   AI Agent / VM     │ ──────────────────────── │   macOS Host        │
-│                     │      JSON messages       │   shell-relay       │
-│                     │ ◀────────────────────── │   daemon            │
-└─────────────────────┘                          └─────────────────────┘
-                                                          │
-                                                          ▼
+┌────────────────────┐       wss:// (TLS)       ┌──────────────────┐
+│                    │ ──────────────────────── │   macOS Host     │
+│   AI Agent / VM    │      JSON messages       │   shell-relay    │
+│                    │ ◀──────────────────────  │   daemon         │
+└────────────────────┘                          └──────────────────┘
+                                                           │
+                                                           ▼
                                                  ┌─────────────────┐
                                                  │   zsh session   │
                                                  │   (per client)  │
